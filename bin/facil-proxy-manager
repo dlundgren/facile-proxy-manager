@@ -1,0 +1,601 @@
+#!/usr/bin/python
+
+import atexit
+import cmd
+import ConfigParser
+import cookielib
+import datetime
+import htmllib
+import os
+import sys
+import readline
+import urllib2
+import urlparse
+
+import FacilProxyManager
+import FacilProxyManager.misc
+import FacilProxyManager.restart
+import FacilProxyManager.session
+
+DIRNAME = os.path.expanduser( '~/.FacilProxyManager' )
+
+def setup_directory():
+    """Setup the settings directory if it does not already exist"""
+
+    path = os.path.expanduser( DIRNAME )
+    # Try Create DIRNAME, ignoring EEXIST
+    try:
+        os.mkdir( path )
+    except OSError, exc:
+        if exc.errno == 17:
+            pass
+        else:
+            raise
+
+def load_history():
+    """Load the command history"""
+
+    histfile = os.path.expanduser( '%s/history' % ( DIRNAME ) )
+    setup_directory()
+
+    try:
+        readline.read_history_file( histfile )
+    except IOError:
+        pass
+
+    # Remove "-" from the completer delimiters
+    readline.set_completer_delims("""`~!@#$%^&*()=+[{]}\|;:'",<>/? """)
+
+    readline.set_history_length(100)
+
+    atexit.register( readline.write_history_file, histfile )
+
+def load_configuration():
+    """Load the default settings from the configuration file if it exists"""
+
+    config = ConfigParser.SafeConfigParser()
+
+    setup_directory()
+
+    config_file = os.path.expanduser( '%s/config' % ( DIRNAME ) )
+    if os.access( config_file, os.F_OK ) :
+        config.read( config_file )
+    else:
+        # There was no configuration file, set reasonable defaults
+        config.set( "DEFAULT", "host", "localhost.localdomain" )
+        config.set( "DEFAULT", "port", "2048" )
+        config.set( "DEFAULT", "cookiename", "ezproxy" )
+        config.set( "DEFAULT", "has_ssl", "False" )
+        config.set( "DEFAULT", "username", "admin" )
+        config.set( "DEFAULT", "password", "password" )
+        config.set( "DEFAULT", "testing", "True" )
+
+        # Try to save the configuration for next time
+        try:
+            fp = open( config_file, "w")
+            config.write( fp )
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    return config
+
+
+class FacilProxyCmd(cmd.Cmd):
+    """EZProxy management command line interface"""
+
+    config = load_configuration()
+
+    host = config.get( "DEFAULT", "host" )
+    port = config.getint( "DEFAULT", "port" )
+    cookiename = config.get( "DEFAULT", "cookiename" )
+    username = config.get( "DEFAULT", "username" )
+    password = config.get( "DEFAULT", "password" )
+    testing = config.getboolean( "DEFAULT", "testing" )
+    has_ssl = config.getboolean( "DEFAULT", "has_ssl" )
+    protocol = "http"
+    connected = False
+
+    cookiejar = cookielib.CookieJar(policy=cookielib.DefaultCookiePolicy())
+    opener = urllib2.build_opener(
+        urllib2.HTTPCookieProcessor( cookiejar ),
+    )
+
+    prompt = "facil-proxy-manager> "
+
+    def emptyline(self):
+        return
+
+    def help_help(self):
+        print "No help for the weary"
+
+    def do_status(self, ignored):
+        """Print the internal status settings"""
+
+        print "Host: %s" % ( self.host )
+        print "Cookiename: %s" % ( self.cookiename )
+        print "Username: %s" % ( self.username )
+        print "Password: %s" % ( self.password )
+        print "Testing: %s" % ( self.testing )
+        print "SSL: %s" % ( self.has_ssl )
+        print "Connected: %s" % ( self.connected )
+
+    def do_host(self, hostname):
+        """Set the EZProxy server name to connect to"""
+
+        # If no hostname was passed in, do nothing
+        if hostname == '':
+            return
+
+        # If there is a section with this hostname, use its settings
+        if self.config.has_section( hostname ):
+            self.host = hostname
+            self.port = self.config.getint( self.host, "port" )
+            self.cookiename = self.config.get( self.host, "cookiename" )
+            self.username = self.config.get( self.host, "username" )
+            self.password = self.config.get( self.host, "password" )
+            self.testing = self.config.getboolean( self.host, "testing" )
+            self.has_ssl = self.config.get( self.host, "has_ssl" )
+        # Otherwise, use the DEFAULT settings
+        else:
+            self.host = hostname
+            self.port = self.config.getint( "DEFAULT", "port" )
+            self.cookiename = self.config.get( "DEFAULT", "cookiename" )
+            self.username = self.config.get( "DEFAULT", "username" )
+            self.password = self.config.get( "DEFAULT", "password" )
+            self.testing = self.config.getboolean( "DEFAULT", "testing" )
+            self.has_ssl = self.config.get( "DEFAULT", "has_ssl" )
+
+        if self.has_ssl is True:
+            self.protocol = "https"
+        else:
+            self.protocol = "http"
+
+    def complete_host( self, text, line, begidx, endidx ):
+        """Complete function for the host command"""
+
+        hosts = []
+
+        for host in self.config.sections():
+            if host.startswith(text):
+                hosts.append(host)
+
+        if len(hosts) == 0 and begidx == 5 and endidx == 5:
+            hosts = self.config.sections()
+
+        return hosts
+
+    def do_login(self, ignored):
+        """Login to the EZProxy server"""
+
+        url = "%s://%s:%s/login" % ( self.protocol, self.host, self.port )
+        data = "user=%s&pass=%s" % ( self.username, self.password, )
+        try:
+            req = self.opener.open( url, data )
+            reply = req.info()
+            self.connected = True
+        except urllib2.HTTPError, exc:
+            reply = exc.info()
+        except urllib2.URLError, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        if reply["Server"] != "EZproxy":
+            msg = "Not connected to EZProxy (%s)" % (
+                reply["Server"]
+            )
+            print "ERROR: %s" % ( msg )
+            self.connected = False
+            return
+
+        if sys.stdin.isatty():
+            for cookie in self.cookiejar:
+                if self.cookiename == cookie.name:
+                    ( cookie_url, session ) = cookie.value.split(",")
+                    parsed_url = urlparse.urlparse( cookie_url )
+                    print "Logged into %s with session %s" % ( 
+                        parsed_url[1], session 
+                    )
+
+    def do_logout(self, ignored):
+        """Logout from the EZProxy server"""
+
+        if self.connected is True:
+            url = "%s://%s:%s/logout" % ( self.protocol, self.host, self.port )
+            try:
+                req = self.opener.open( url )
+                reply = req.info()
+            except urllib2.HTTPError, exc:
+                reply = exc.info()
+            except urllib2.URLError, exc:
+                print "ERROR: %s" % ( exc )
+                return
+
+            if reply["Server"] != "EZproxy":
+                raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+
+            # Regardless of the server reply, assume 
+            # that we are indeed logged out
+            self.connected = False
+
+    def do_restart(self, ignored):
+        """Restart the EZProxy server"""
+
+        try:
+            url = "%s://%s:%s/restart" % ( self.protocol, self.host, self.port )
+            req = self.opener.open( url )
+        except urllib2.HTTPError, exc:
+            reply = exc.info()
+        except urllib2.URLError, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        # Parse status reply
+        restart = FacilProxyManager.restart.EZPRestartParser()
+        restart.feed(req.read())
+
+        url = "%s://%s:%s/restart" % ( self.protocol, self.host, self.port )
+        data = "pid=%s&confirm=%s" % ( restart.pid, "RESTART" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    def get_status_page(self):
+        """Retrieve the server status page"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        try:
+            req = self.opener.open( url )
+            reply = req.info()
+        except urllib2.HTTPError, exc:
+            reply = exc.info()
+        except urllib2.URLError, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        if reply["Server"] != "EZproxy":
+            raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+
+        return req
+
+    def get_session(self):
+        """Parse the server status information"""
+
+        req = self.get_status_page()
+
+        # Parse status reply
+        status = FacilProxyManager.session.EZPSessionParser()
+        status.feed(req.read())
+
+        return status
+
+    def get_misc(self):
+        """Parse the server miscellaneous information"""
+
+        req = self.get_status_page()
+
+        # Parse status reply
+        misc = FacilProxyManager.misc.EZPMiscParser()
+        misc.feed(req.read())
+
+        return misc
+
+    def print_session(self, session):
+        if session.has_key("generic"):
+            print "%s, %s, %s, %s, %s, %s" % (
+                               session["session"],
+                               session["username"],
+                               session["from"],
+                               session["created"],
+                               session["accessed"],
+                               session["generic"],
+            )
+        else:
+            print "%s, %s, %s, %s, %s" % (
+                               session["session"],
+                               session["username"],
+                               session["from"],
+                               session["created"],
+                               session["accessed"],
+            )
+                
+    def do_list_sessions(self, arg):
+        """List all of the active sessions on the server"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        for session in status.sessions:
+            self.print_session(status.sessions[session])
+
+    def do_list_session_username(self, arg):
+        """List the active sessions for the given user"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        for session in status.sessions:
+            if status.sessions[session]["username"] == arg:
+                self.print_session(status.sessions[session])
+
+    def do_list_session_from(self, arg):
+        """List the active sessions for the given host/ip"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        for session in status.sessions:
+            if status.sessions[session]["from"] == arg:
+                self.print_session(status.sessions[session])
+
+
+    def call_ezproxy_action( self, url, data = None ):
+        """Attempt an EZProxy operation that is not read-only"""
+
+        if self.testing is not True:
+
+            try:
+                req = self.opener.open( url, data )
+                reply = req.info()
+            except urllib2.HTTPError, exc:
+                reply = exc.info()
+            except urllib2.URLError, exc:
+                print "ERROR: %s" % ( exc )
+                return
+
+            if reply["Server"] != "EZproxy":
+                raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+
+        else:
+
+            print "call_ezproxy_action(%s, %s)" % ( url, data )
+
+    def do_terminate_session(self, arg):
+        """Clear a specific session by session ID"""
+
+        print "Terminating session %s" % ( arg )
+
+        url = "%s://%s:%s/status?session=%s&confirm=yes" % (
+            self.protocol, self.host, self.port,  arg
+        )
+
+        try:
+            self.call_ezproxy_action( url )
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+
+    def do_terminate_session_created_before(self, arg):
+        """Clear sessions older than the given date (YYYY-MM-DD)"""
+
+        (year, month, day) = arg.split("-")
+        d = datetime.date(int(year), int(month), int(day))
+        t = datetime.time(0, 0, 0)
+        the_date = datetime.datetime.combine(d, t)
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        # Terminate the sessions by date
+        for session in status.sessions:
+                if status.sessions[session]["created"] < the_date:
+                        print "Terminating session %s" % (
+                                status.sessions[session]["session"]
+                        )
+                        url = "%s://%s:%s%s&confirm=yes" % (
+                                        self.protocol, self.host, self.port, 
+                                        status.sessions[session]["href"]
+                                )
+                        try:
+                            self.call_ezproxy_action( url )
+                        except Exception, exc:
+                            print "ERROR: %s" % ( exc )
+                            return
+
+    def do_terminate_session_from(self, arg):
+        """Terminate connections from a given host/ip"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        # Terminate the sessions by host/ip
+        for session in status.sessions:
+                if status.sessions[session]["from"] == arg:
+                        print "Terminating session %s" % (
+                                status.sessions[session]["session"]
+                        )
+                        url = "%s://%s:%s%s&confirm=yes" % (
+                                        self.protocol, self.host, self.port, 
+                                        status.sessions[session]["href"]
+                                )
+                        try:
+                            self.call_ezproxy_action( url )
+                        except Exception, exc:
+                            print "ERROR: %s" % ( exc )
+                            return
+
+    def do_terminate_session_username(self, arg):
+        """Terminate connections from a given username"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        # Terminate the sessions by username
+        for session in status.sessions:
+                if status.sessions[session]["username"] == arg:
+                        print "Terminating session %s" % (
+                                status.sessions[session]["session"]
+                        )
+                        url = "%s://%s:%s%s&confirm=yes" % (
+                                        self.protocol, self.host, self.port, 
+                                        status.sessions[session]["href"]
+                                )
+                        try:
+                            self.call_ezproxy_action( url )
+                        except Exception, exc:
+                            print "ERROR: %s" % ( exc )
+                            return
+
+    def do_session_active(self, arg):
+        """Display the peak sessions active"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak sessions active: %d" % ( 
+            misc.data["sessions_active"], 
+        )
+
+    def do_session_limit(self, arg):
+        """Display the peak sessions limit"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak sessions limit: %d" % ( 
+            misc.data["sessions_limit"],
+        )
+
+    def do_transfers_active(self, arg):
+        """Display the peak concurrent transfers active"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak concurrent transfers active: %d" % (
+            misc.data["transfers_active"], 
+        )
+
+    def do_transfers_limit(self, arg):
+        """Display the peak concurrent transfers limit"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak concurrent transfers limit: %d" % (
+            misc.data["transfers_limit"],
+        )
+
+    def do_hosts_active(self, arg):
+        """Display the peak virtual hosts active"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak virtual hosts: %d" % (
+            misc.data["hosts_peak"], 
+        )
+
+    def do_hosts_limit(self, arg):
+        """Display the peak virtual hosts limit"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Peak virtual host limit: %d" % (
+            misc.data["hosts_limit"],
+        )
+
+    def do_ssl_status(self, line):
+        """Display the SSL initialization status"""
+
+        # Retrieve server miscellaneous information
+        try:
+            misc = self.get_misc()
+            if misc is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        if misc.data["ssl_init"]:
+            print "SSL is initialized"
+        else:
+            print "SSL is NOT initialized"
+
+    def do_EOF(self, line):
+        self.do_logout('')
+        return True
+
+    def help_EOF(self):
+        print "End Of File; invoked when ^D is entered or standard input is closed"
+
+    do_quit = do_EOF
+
+    def help_quit(self):
+        print "Exit the program"
+
+if __name__ == '__main__':
+
+    if sys.stdin.isatty():
+        intro = "Use the 'help' command to access interactive help"
+    else:
+        intro = ""
+
+    load_history()
+
+    FacilProxyCmd().cmdloop( intro )
+
+# vim:expandtab:ts=4
