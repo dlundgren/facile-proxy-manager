@@ -8,7 +8,6 @@ import datetime
 import htmllib
 import os
 import sys
-import readline
 import urllib2
 import urlparse
 
@@ -16,6 +15,24 @@ import FacileProxyManager
 import FacileProxyManager.misc
 import FacileProxyManager.restart
 import FacileProxyManager.session
+
+import readline
+
+# Thanks to http://www.farmckon.net/?p=181 for the idea behind this block
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline as readline
+    except ImportError:
+	msg = "Could not import a readline library"
+	raise SystemExit( msg )
+else:
+    import rlcompleter
+    if(sys.platform == 'darwin'):
+        readline.parse_and_bind ("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
 
 DIRNAME = os.path.expanduser( '~/.FacileProxyManager' )
 
