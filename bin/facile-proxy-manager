@@ -13,6 +13,7 @@ import urlparse
 
 import FacileProxyManager
 import FacileProxyManager.misc
+import FacileProxyManager.release
 import FacileProxyManager.restart
 import FacileProxyManager.session
 
@@ -297,6 +298,17 @@ class FacileProxyCmd(cmd.Cmd):
         misc.feed(req.read())
 
         return misc
+
+    def get_release(self):
+        """Parse the server release information"""
+
+        req = self.get_status_page()
+
+        # Parse status reply
+        rel = FacileProxyManager.release.EZPReleaseParser()
+        rel.feed(req.read())
+
+        return rel
 
     def print_session(self, session):
         if session.has_key("generic"):
@@ -591,6 +603,42 @@ class FacileProxyCmd(cmd.Cmd):
             print "SSL is initialized"
         else:
             print "SSL is NOT initialized"
+
+    def do_license_status(self, line):
+        """Display the EZproxy release information"""
+
+        # Retrieve server license information
+        try:
+            rel = self.get_release()
+            if rel is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "EZproxy %s %s for %s started at %s" % (
+            rel.data[ "release" ][ "version" ], 
+            rel.data[ "release" ][ "line" ], 
+            rel.data[ "release" ][ "os" ], 
+            rel.data[ "release" ][ "started" ], 
+        )
+
+    def do_validation_status(self, line):
+        """Display the EZproxy license validation status"""
+
+        # Retrieve server license information
+        try:
+            rel = self.get_release()
+            if rel is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "EZproxy was last able to validate the license on %s." % (
+            rel.data[ "validation" ],
+        )
+
 
     def do_EOF(self, line):
         self.do_logout('')
