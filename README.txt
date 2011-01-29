@@ -1,8 +1,8 @@
 ===================
-Facil Proxy Manager
+Facile Proxy Manager
 ===================
 
-Facil Proxy Manager provides a scriptable interface for OCLC's EZProxy.  This 
+Facile Proxy Manager provides a scriptable interface for OCLC's EZProxy.  This 
 can be particularly useful when a large number of operations need performed
 against the server --  such as clearing out a large number of sessions --
 without having to do each operation by hand in a web browser.
@@ -10,10 +10,10 @@ without having to do each operation by hand in a web browser.
 Initial setup
 =============
 
-Facil Proxy Manager creates a settings directory under ~/.FacilProxyManager 
+Facile Proxy Manager creates a settings directory under ~/.FacileProxyManager 
 where it stores the following files::
 
-* ~/.FacilProxyManager/config
+* ~/.FacileProxyManager/config
 
 This is a ConfigParser-formatted configuration file.  It allows you to set
 global default values, as well as server-specific settings.  This file will be
@@ -21,7 +21,7 @@ created and populated with sample values the first time the program is run.
 Server-specific settings can be added to their own section, which will
 override the default values.
 
-* ~/.FacilProxyManager/history
+* ~/.FacileProxyManager/history
 
 This file is populated with the history of commands executed within the
 program.
@@ -77,7 +77,7 @@ Multiple Servers
 ----------------------
 
 The section handling functionality of ConfigParser is used to configure 
-FacilProxyManager for multiple servers.  To setup 2 servers, one using SSL
+FacileProxyManager for multiple servers.  To setup 2 servers, one using SSL
 certificates, and the other using port 80, the following lines would be added
 to the config file::
 

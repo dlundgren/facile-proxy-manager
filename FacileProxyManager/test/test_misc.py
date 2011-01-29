@@ -5,7 +5,7 @@ Unit tests for EZPMiscParser
 import gzip
 import unittest
 
-from FacilProxyManager import misc
+from FacileProxyManager import misc
 
 def suite():
     """Return a pre-built test suite"""

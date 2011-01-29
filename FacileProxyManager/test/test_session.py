@@ -5,7 +5,7 @@ Unit tests for EZPSessionParser
 import gzip
 import unittest
 
-from FacilProxyManager import session
+from FacileProxyManager import session
 
 def suite():
     """Return a pre-built test suite"""

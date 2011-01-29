@@ -1,5 +1,5 @@
 """
-Distutils packaging for Facil Proxy Manager
+Distutils packaging for Facile Proxy Manager
 """
 
 from distutils.core import setup
@@ -18,16 +18,16 @@ setup(
         'Topic :: Utilities',
     ],
     license='GPL',
-    name='FacilProxyManager',
-    version='0.1.0',
+    name='FacileProxyManager',
+    version='0.1.1',
     maintainer="Andrew Anderson",
     maintainer_email='andrew@lirn.net',
     url='http://www.lirn.net/',
     packages=[
-        'FacilProxyManager',
+        'FacileProxyManager',
     ],
     scripts=[
-        'bin/facil-proxy-manager', 
+        'bin/facile-proxy-manager', 
     ],
     package_dir={ },
     package_data={ },

@@ -5,7 +5,7 @@ Unit tests for EZPRestartParser
 import gzip
 import unittest
 
-from FacilProxyManager import restart
+from FacileProxyManager import restart
 
 def suite():
     """Return a pre-built test suite"""

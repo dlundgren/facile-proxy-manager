@@ -12,12 +12,12 @@ import readline
 import urllib2
 import urlparse
 
-import FacilProxyManager
-import FacilProxyManager.misc
-import FacilProxyManager.restart
-import FacilProxyManager.session
+import FacileProxyManager
+import FacileProxyManager.misc
+import FacileProxyManager.restart
+import FacileProxyManager.session
 
-DIRNAME = os.path.expanduser( '~/.FacilProxyManager' )
+DIRNAME = os.path.expanduser( '~/.FacileProxyManager' )
 
 def setup_directory():
     """Setup the settings directory if it does not already exist"""
@@ -80,7 +80,7 @@ def load_configuration():
     return config
 
 
-class FacilProxyCmd(cmd.Cmd):
+class FacileProxyCmd(cmd.Cmd):
     """EZProxy management command line interface"""
 
     config = load_configuration()
@@ -211,7 +211,7 @@ class FacilProxyCmd(cmd.Cmd):
                 return
 
             if reply["Server"] != "EZproxy":
-                raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+                raise FacileProxyManager.ServerNotEZProxy( reply["Server"] )
 
             # Regardless of the server reply, assume 
             # that we are indeed logged out
@@ -230,7 +230,7 @@ class FacilProxyCmd(cmd.Cmd):
             return
 
         # Parse status reply
-        restart = FacilProxyManager.restart.EZPRestartParser()
+        restart = FacileProxyManager.restart.EZPRestartParser()
         restart.feed(req.read())
 
         url = "%s://%s:%s/restart" % ( self.protocol, self.host, self.port )
@@ -255,7 +255,7 @@ class FacilProxyCmd(cmd.Cmd):
             return
 
         if reply["Server"] != "EZproxy":
-            raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+            raise FacileProxyManager.ServerNotEZProxy( reply["Server"] )
 
         return req
 
@@ -265,7 +265,7 @@ class FacilProxyCmd(cmd.Cmd):
         req = self.get_status_page()
 
         # Parse status reply
-        status = FacilProxyManager.session.EZPSessionParser()
+        status = FacileProxyManager.session.EZPSessionParser()
         status.feed(req.read())
 
         return status
@@ -276,7 +276,7 @@ class FacilProxyCmd(cmd.Cmd):
         req = self.get_status_page()
 
         # Parse status reply
-        misc = FacilProxyManager.misc.EZPMiscParser()
+        misc = FacileProxyManager.misc.EZPMiscParser()
         misc.feed(req.read())
 
         return misc
@@ -357,7 +357,7 @@ class FacilProxyCmd(cmd.Cmd):
                 return
 
             if reply["Server"] != "EZproxy":
-                raise FacilProxyManager.ServerNotEZProxy( reply["Server"] )
+                raise FacileProxyManager.ServerNotEZProxy( reply["Server"] )
 
         else:
 
@@ -596,6 +596,6 @@ if __name__ == '__main__':
 
     load_history()
 
-    FacilProxyCmd().cmdloop( intro )
+    FacileProxyCmd().cmdloop( intro )
 
 # vim:expandtab:ts=4
