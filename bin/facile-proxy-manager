@@ -329,6 +329,18 @@ class FacileProxyCmd(cmd.Cmd):
                                session["accessed"],
             )
                 
+    def do_count_sessions(self, arg):
+        """Count all of the active sessions on the server"""
+
+        # Retrieve server status
+        try:
+            status = self.get_session()
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+	print "Active session count: %d" % ( len(status.sessions) )
+
     def do_list_sessions(self, arg):
         """List all of the active sessions on the server"""
 

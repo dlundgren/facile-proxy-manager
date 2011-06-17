@@ -19,7 +19,7 @@ setup(
     ],
     license='GPL',
     name='FacileProxyManager',
-    version='0.1.1',
+    version='0.1.2',
     maintainer="Andrew Anderson",
     maintainer_email='andrew@lirn.net',
     url='http://www.lirn.net/',
