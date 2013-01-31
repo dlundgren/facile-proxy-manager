@@ -12,7 +12,6 @@ class EZPMiscParser( HTMLParser ):
     # pylint: disable=R0904
 
     found_misc_a = False
-    found_misc_p = False
 
     data = {
         'sessions_active': 0,
