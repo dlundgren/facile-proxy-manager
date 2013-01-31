@@ -12,6 +12,7 @@ import urllib2
 import urlparse
 
 import FacileProxyManager
+import FacileProxyManager.maint
 import FacileProxyManager.misc
 import FacileProxyManager.release
 import FacileProxyManager.restart
@@ -208,10 +209,8 @@ class FacileProxyCmd(cmd.Cmd):
         if sys.stdin.isatty():
             for cookie in self.cookiejar:
                 if self.cookiename == cookie.name:
-                    ( cookie_url, session ) = cookie.value.split(",")
-                    parsed_url = urlparse.urlparse( cookie_url )
                     print "Logged into %s with session %s" % ( 
-                        parsed_url[1], session 
+                        cookie.domain, cookie.value
                     )
 
     def do_logout(self, ignored):
@@ -298,6 +297,18 @@ class FacileProxyCmd(cmd.Cmd):
         misc.feed(req.read())
 
         return misc
+
+    def get_maint(self):
+        """Parse the server hostmaintenance information"""
+
+        req = self.get_status_page()
+
+        # Parse status reply
+        maint = FacileProxyManager.maint.EZPMaintParser()
+        maint.feed(req.read())
+
+        return maint
+
 
     def get_release(self):
         """Parse the server release information"""
@@ -616,6 +627,112 @@ class FacileProxyCmd(cmd.Cmd):
         else:
             print "SSL is NOT initialized"
 
+    def do_maintenance_show_orphan(self, arg):
+        """Display the number of orphaned host entries"""
+
+        # Retrieve server hostmaintenance information
+        try:
+            maint = self.get_maint()
+            if maint is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Orphaned Host Entries: %d" % ( 
+            int(maint.data["m1"]["count"]), 
+        )
+
+    def do_maintenance_remove_orphan(self, arg):
+        """Remove orphaned host entries"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        data = "maint=%s" % ( "m1" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+            print "To complete the removal of these hosts, you must now restart EZproxy"
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    def do_maintenance_show_unused(self, arg):
+        """Display the number of unused host entries"""
+
+        # Retrieve server hostmaintenance information
+        try:
+            maint = self.get_maint()
+            if maint is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Unused Host Entries: %d" % ( 
+            int(maint.data["m2"]["count"]), 
+        )
+
+    def do_maintenance_remove_unused(self, arg):
+        """Remove unused host entries"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        data = "maint=%s" % ( "m2" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+            print "To complete the removal of these hosts, you must now restart EZproxy"
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    def do_maintenance_show_shutdown(self, arg):
+        """Display the number of proxy by port entries that can be shutdown"""
+
+        # Retrieve server hostmaintenance information
+        try:
+            maint = self.get_maint()
+            if maint is None:
+                return
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+            return
+
+        print "Unused Host Entries: %d" % ( 
+            int(maint.data["m3"]["count"]), 
+        )
+
+    def do_maintenance_shutdown_ports(self, arg):
+        """Shutdown ports previously assigned to proxy by port"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        data = "maint=%s" % ( "m3" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+            print "To complete the removal of these ports, you must now restart EZproxy"
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    def do_maintenance_reset_dates_and_counts(self, arg):
+        """Reset accessed and referenced dates and counts of all hosts"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        data = "maint=%s" % ( "m4" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
+    def do_maintenance_compress_port_usage(self, arg):
+        """Compress port usage by reassigning higher ports into any available gaps"""
+
+        url = "%s://%s:%s/status" % ( self.protocol, self.host, self.port )
+        data = "maint=%s" % ( "m5" )
+
+        try:
+            self.call_ezproxy_action( url, data )
+        except Exception, exc:
+            print "ERROR: %s" % ( exc )
+
     def do_license_status(self, line):
         """Display the EZproxy release information"""
 
@@ -650,7 +767,6 @@ class FacileProxyCmd(cmd.Cmd):
         print "EZproxy was last able to validate the license on %s." % (
             rel.data[ "validation" ],
         )
-
 
     def do_EOF(self, line):
         self.do_logout('')
