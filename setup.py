@@ -4,6 +4,9 @@ Distutils packaging for Facile Proxy Manager
 
 from distutils.core import setup
 
+name='FacileProxyManager'
+version='0.1.2'
+
 setup(
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -18,11 +21,12 @@ setup(
         'Topic :: Utilities',
     ],
     license='GPL',
-    name='FacileProxyManager',
-    version='0.1.2',
+    name=name,
+    version=version,
     maintainer="Andrew Anderson",
     maintainer_email='andrew@lirn.net',
-    url='http://www.lirn.net/',
+    url='https://code.google.com/p/facile-proxy-manager/',
+    download_url='http://facile-proxy-manager.googlecode.com/files/%s-%s.tar.gz' % ( name, version ),
     packages=[
         'FacileProxyManager',
     ],
