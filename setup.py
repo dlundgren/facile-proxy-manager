@@ -5,7 +5,7 @@ Distutils packaging for Facile Proxy Manager
 from distutils.core import setup
 
 name='FacileProxyManager'
-version='0.1.2'
+version='0.1.3'
 
 setup(
     classifiers=[
