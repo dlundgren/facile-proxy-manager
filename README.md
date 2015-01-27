@@ -10,7 +10,7 @@ without having to do each operation by hand in a web browser.
 Facile Proxy Manager creates a settings directory under ~/.FacileProxyManager 
 where it stores the following files::
 
-* ~/.FacileProxyManager/config
+`~/.FacileProxyManager/config`
 
 This is a ConfigParser-formatted configuration file.  It allows you to set
 global default values, as well as server-specific settings.  This file will be
@@ -18,7 +18,7 @@ created and populated with sample values the first time the program is run.
 Server-specific settings can be added to their own section, which will
 override the default values.
 
-* ~/.FacileProxyManager/history
+`~/.FacileProxyManager/history`
 
 This file is populated with the history of commands executed within the
 program.
