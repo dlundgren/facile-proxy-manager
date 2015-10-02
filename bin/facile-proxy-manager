@@ -121,6 +121,10 @@ class FacileProxyCmd(cmd.Cmd):
 
     prompt = "facil-proxy-manager> "
 
+    def __init__(self):
+        cmd.Cmd.__init__(self)
+        self.determine_protocol()
+
     def emptyline(self):
         return
 
@@ -164,6 +168,10 @@ class FacileProxyCmd(cmd.Cmd):
             self.testing = self.config.getboolean( "DEFAULT", "testing" )
             self.has_ssl = self.config.get( "DEFAULT", "has_ssl" )
 
+        self.determine_protocol()
+
+    def determine_protocol(self):
+        """Determines the protocol based on whether or not has_ssl is set"""
         if self.has_ssl is True:
             self.protocol = "https"
         else:
